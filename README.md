@@ -22,8 +22,10 @@ MoteCMS is transport-agnostic. It does not implement LoRa, LoRaWAN, Reticulum, I
 - Header, sidebar or hidden navigation placement.
 - Configurable menu ordering.
 - Password-protected `/admin/` interface for create, edit and delete.
+- Multi-user support with **admin** and **editor** roles.
 - PHP session authentication with `password_hash()` / `password_verify()`.
-- CSRF protection for write and logout actions.
+- CSRF protection for all write, login and logout actions.
+- Activity logging for admin actions (login, page changes, user management).
 - ETag and Last-Modified headers for public pages.
 - Restrictive security headers.
 
@@ -35,8 +37,17 @@ MoteCMS is transport-agnostic. It does not implement LoRa, LoRaWAN, Reticulum, I
 
 ## Quick start
 
+### Multi-user mode (default)
 ```sh
 cp config/config.example.php config/config.php
+# Edit config/users.php to set your admin password
+php -S 127.0.0.1:8080 -t public
+```
+
+### Single-user mode (legacy)
+```sh
+cp config/config.example.php config/config.php
+# Set multi_user_mode to false in config/config.php
 php bin/hash-password.php 'choose a strong password'
 export MOTECMS_ADMIN_PASSWORD_HASH='paste_generated_hash_here'
 php -S 127.0.0.1:8080 -t public
@@ -82,11 +93,13 @@ Raw HTML is escaped. Unsafe link schemes such as `javascript:` are not emitted a
 
 ```text
 bin/                 password hash helper
-config/              non-secret configuration example
+config/              non-secret configuration example and users file
+config/users.php     user accounts (created on first setup)
 content/pages/       file-based page content
 public/              web root
 public/admin/        administration interface
 public/assets/       single stylesheet
+public/cache/        page cache (created automatically)
 src/                 small PHP classes and bootstrap
 templates/           public layout templates
 tests/               dependency-free test runner
@@ -100,12 +113,15 @@ The public interface has one CSS request, no JavaScript, no external network req
 
 Set `MOTECMS_ADMIN_PASSWORD_HASH` in the environment; never commit a real password or hash. Sessions use HttpOnly and SameSite=Strict cookies, with Secure enabled when HTTPS is detected. The admin interface protects mutations with CSRF tokens. Content files are addressed only through validated slugs and written via temporary files plus atomic rename.
 
+Multi-user mode is enabled by default and uses a `config/users.php` file. To use single-user mode, set `multi_user_mode` to `false` in `config/config.php` and use the `MOTECMS_ADMIN_PASSWORD_HASH` environment variable as before.
+
 ## Limitations
 
-- No database, media library, themes, plugins or user roles.
+- No database, media library, themes or plugins.
 - No complete Markdown implementation.
 - No clean URLs by default.
 - No conflict resolution for simultaneous edits beyond file locking during writes.
+- User roles are limited to **admin** and **editor** (no custom roles).
 
 ## Roadmap
 
@@ -113,6 +129,8 @@ Set `MOTECMS_ADMIN_PASSWORD_HASH` in the environment; never commit a real passwo
 - Import/export helpers.
 - More tests around deployment environments.
 - Optional transport packaging examples while keeping the core transport-agnostic.
+- User profile management (password change, etc.).
+- Log export and rotation tools.
 
 ## License
 
