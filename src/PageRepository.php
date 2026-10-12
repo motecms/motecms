@@ -7,7 +7,7 @@ use RuntimeException;
 
 final class PageRepository
 {
-    public function __construct(private string $dir)
+    public function __construct(private string $dir, private ?Logger $logger = null)
     {
         if (!is_dir($dir)) {
             throw new RuntimeException('Content directory does not exist: ' . $dir);
@@ -74,13 +74,15 @@ final class PageRepository
     }
 
     /** @param array<string,mixed> $data */
-    public function save(array $data, ?string $currentSlug = null): void
+    public function save(array $data, ?string $currentSlug = null, ?string $user = null): void
     {
         $errors = $this->validate($data, $currentSlug);
         if ($errors !== []) {
             throw new RuntimeException(implode(' ', $errors));
         }
         $slug = (string)$data['slug'];
+        $action = $currentSlug === null ? 'create' : 'update';
+        
         $meta = ['title' => trim((string)$data['title']), 'slug' => $slug, 'status' => (string)$data['status'], 'menu' => (string)$data['menu'], 'order' => (int)$data['order']];
         $text = FrontMatter::serialize($meta, (string)($data['content'] ?? ''));
         $target = $this->pathForSlug($slug);
@@ -97,17 +99,19 @@ final class PageRepository
                 $old = $this->pathForSlug($currentSlug);
                 if (is_file($old)) unlink($old);
             }
+            $this->logger?->info("Page $action: $slug", ['user' => $user, 'title' => $data['title']]);
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);
         }
     }
 
-    public function delete(string $slug): void
+    public function delete(string $slug, ?string $user = null): void
     {
         if (!self::validSlug($slug)) throw new RuntimeException('Invalid slug.');
         $file = $this->pathForSlug($slug);
         if (is_file($file) && !unlink($file)) throw new RuntimeException('Unable to delete page.');
+        $this->logger?->info("Page deleted: $slug", ['user' => $user]);
     }
 
     public function latestMtime(): int
