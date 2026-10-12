@@ -26,12 +26,13 @@ function page_form(array $page, array $errors, string $action, string $button): 
 
 if (!$auth->check()) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!Csrf::valid((string)($_POST['csrf'] ?? ''))) { http_response_code(400); admin_header('Bad request'); echo '<p class="error">Invalid CSRF token.</p>'; admin_footer(); exit; }
         if ($auth->login((string)($_POST['password'] ?? ''))) { header('Location: index.php'); exit; }
         $errors[] = 'Login failed.';
     }
     admin_header('MoteCMS login');
     if ($errors) echo '<p class="error">' . e($errors[0]) . '</p>';
-    echo '<h1>MoteCMS login</h1><form method="post"><p class="field"><label>Password<input type="password" name="password" required></label></p><p><button>Log in</button></p></form>';
+    echo '<h1>MoteCMS login</h1><form method="post"><input type="hidden" name="csrf" value="' . e(Csrf::token()) . '"><p class="field"><label>Password<input type="password" name="password" required></label></p><p><button>Log in</button></p></form>';
     admin_footer(); exit;
 }
 
@@ -40,7 +41,7 @@ try {
     if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') { require_csrf(); $errors = $repo->validate($_POST); if (!$errors) { $repo->save($_POST); header('Location: index.php'); exit; } }
     if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') { require_csrf(); $current = (string)$_POST['current_slug']; $errors = $repo->validate($_POST, $current); if (!$errors) { $repo->save($_POST, $current); header('Location: index.php'); exit; } }
     if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') { require_csrf(); $repo->delete((string)$_POST['slug']); header('Location: index.php'); exit; }
-} catch (Throwable $e) { $errors[] = $e->getMessage(); }
+} catch (Throwable $e) { error_log($e->getMessage()); $errors[] = 'An error occurred.'; }
 
 admin_header('MoteCMS admin');
 echo '<h1>MoteCMS admin</h1><p class="actions"><a class="button" href="?action=new">Create page</a><form method="post" action="?action=logout"><input type="hidden" name="csrf" value="' . e(Csrf::token()) . '"><button>Log out</button></form></p>';

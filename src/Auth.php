@@ -19,6 +19,7 @@ final class Auth
         $hash = getenv('MOTECMS_ADMIN_PASSWORD_HASH') ?: '';
         if ($hash !== '' && password_verify($password, $hash)) {
             session_regenerate_id(true);
+            $_SESSION = [];
             $_SESSION['auth'] = true;
             return true;
         }

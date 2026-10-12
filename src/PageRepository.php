@@ -10,7 +10,7 @@ final class PageRepository
     public function __construct(private string $dir)
     {
         if (!is_dir($dir)) {
-            mkdir($dir, 0775, true);
+            throw new RuntimeException('Content directory does not exist: ' . $dir);
         }
     }
 
@@ -81,7 +81,8 @@ final class PageRepository
         $meta = ['title' => trim((string)$data['title']), 'slug' => $slug, 'status' => (string)$data['status'], 'menu' => (string)$data['menu'], 'order' => (int)$data['order']];
         $text = FrontMatter::serialize($meta, (string)($data['content'] ?? ''));
         $target = $this->pathForSlug($slug);
-        $lock = fopen($this->dir . '/.pages.lock', 'c');
+        $lockFile = $this->dir . '/pages.lock';
+        $lock = fopen($lockFile, 'c');
         if ($lock === false) throw new RuntimeException('Unable to lock content directory.');
         try {
             flock($lock, LOCK_EX);
