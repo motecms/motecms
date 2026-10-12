@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/src/bootstrap.php';
 
+use MoteCMS\Auth;
+use MoteCMS\Config;
 use MoteCMS\Csrf;
 use MoteCMS\FrontMatter;
 use MoteCMS\Markdown;
@@ -38,5 +40,28 @@ $repo->save(['title'=>'A2','slug'=>'a','status'=>'published','menu'=>'header','o
 ok($repo->find('a')['title'] === 'A2', 'atomic update');
 $token = Csrf::token();
 ok(Csrf::valid($token) && !Csrf::valid('bad'), 'csrf validation');
-array_map('unlink', glob($dir.'/*') ?: []); array_map('unlink', glob($dir.'/.pages.lock') ?: []); rmdir($dir);
+array_map('unlink', glob($dir.'/*') ?: []); array_map('unlink', glob($dir.'/pages.lock') ?: []); rmdir($dir);
+
+// Test Config
+$config = Config::load();
+ok($config->getString('site_name') === 'MoteCMS', 'config default site_name');
+ok($config->getString('nonexistent', 'default') === 'default', 'config default value');
+
+// Test Auth rate limiting
+$_SESSION = [];
+$auth = new Auth($config);
+$auth->start();
+for ($i = 0; $i < 5; $i++) {
+    ok(!$auth->login('wrongpassword'), 'rate limiting attempt ' . ($i + 1));
+}
+ok(!$auth->login('wrongpassword'), 'rate limiting blocks after 5 attempts');
+
+// Test content length validation
+$longContent = str_repeat('a', 100001);
+$contentValidation = $repo->validate(['title'=>'Test','slug'=>'test-long','status'=>'draft','menu'=>'none','order'=>1,'content'=>$longContent]);
+ok(in_array('Content is too long.', $contentValidation, true), 'content length validation');
+
+// Test PageRepository content length constant
+ok(defined('MoteCMS\PageRepository::MAX_CONTENT_LENGTH'), 'MAX_CONTENT_LENGTH constant defined');
+
 echo "\n$tests tests passed\n";

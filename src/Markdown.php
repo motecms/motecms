@@ -5,6 +5,8 @@ namespace MoteCMS;
 
 final class Markdown
 {
+    private static ?array $compiledPatterns = null;
+
     public function render(string $text): string
     {
         $text = str_replace(["\r\n", "\r"], "\n", $text);
@@ -27,6 +29,18 @@ final class Markdown
                 $list = false;
             }
         };
+        
+        // Initialize compiled patterns
+        if (self::$compiledPatterns === null) {
+            self::$compiledPatterns = [
+                'heading' => '/^(#{1,3})\s+(.+)$/',
+                'list' => '/^-\s+(.+)$/',
+                'link' => '/\[([^\]]+)\]\(([^)\s]+)\)/',
+                'inline_code' => '/`([^`]+)`/',
+                'bold' => '/\*\*([^*]+)\*\*/',
+                'emphasis' => '/(?<!\*)\*([^*]+)\*(?!\*)/'
+            ];
+        }
 
         foreach ($lines as $line) {
             if (trim($line) === '```') {
@@ -51,14 +65,14 @@ final class Markdown
                 $closeList();
                 continue;
             }
-            if (preg_match('/^(#{1,3})\s+(.+)$/', $trim, $m)) {
+            if (preg_match(self::$compiledPatterns['heading'], $trim, $m)) {
                 $flushParagraph();
                 $closeList();
                 $level = strlen($m[1]);
                 $html .= '<h' . $level . '>' . $this->inline($m[2]) . '</h' . $level . ">\n";
                 continue;
             }
-            if (preg_match('/^-\s+(.+)$/', $trim, $m)) {
+            if (preg_match(self::$compiledPatterns['list'], $trim, $m)) {
                 $flushParagraph();
                 if (!$list) {
                     $html .= "<ul>\n";
@@ -80,18 +94,42 @@ final class Markdown
     private function inline(string $text): string
     {
         $safe = $this->esc($text);
-        $safe = preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/', function (array $m): string {
-            $label = $m[1];
-            $url = html_entity_decode($m[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
-            if (!in_array($scheme, ['http', 'https', 'mailto'], true)) {
-                return $label;
-            }
-            return '<a href="' . $this->esc($url) . '">' . $label . '</a>';
-        }, $safe) ?? $safe;
-        $safe = preg_replace('/`([^`]+)`/', '<code>$1</code>', $safe) ?? $safe;
-        $safe = preg_replace('/\*\*([^*]+)\*\*/', '<strong>$1</strong>', $safe) ?? $safe;
-        return preg_replace('/(?<!\*)\*([^*]+)\*(?!\*)/', '<em>$1</em>', $safe) ?? $safe;
+        
+        // Process links
+        $safe = preg_replace_callback(
+            self::$compiledPatterns['link'],
+            function (array $m): string {
+                $label = $m[1];
+                $url = html_entity_decode($m[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+                if (!in_array($scheme, ['http', 'https', 'mailto'], true)) {
+                    return $label;
+                }
+                return '<a href="' . $this->esc($url) . '">' . $label . '</a>';
+            },
+            $safe
+        ) ?? $safe;
+        
+        // Process inline code
+        $safe = preg_replace(
+            self::$compiledPatterns['inline_code'],
+            '<code>$1</code>',
+            $safe
+        ) ?? $safe;
+        
+        // Process bold
+        $safe = preg_replace(
+            self::$compiledPatterns['bold'],
+            '<strong>$1</strong>',
+            $safe
+        ) ?? $safe;
+        
+        // Process emphasis
+        return preg_replace(
+            self::$compiledPatterns['emphasis'],
+            '<em>$1</em>',
+            $safe
+        ) ?? $safe;
     }
 
     private function esc(string $text): string

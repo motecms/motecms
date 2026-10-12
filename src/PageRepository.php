@@ -56,6 +56,8 @@ final class PageRepository
         return is_file($file) ? $this->readFile($file) : null;
     }
 
+    private const MAX_CONTENT_LENGTH = 100000; // 100KB
+
     /** @param array<string,mixed> $data @return array<int,string> */
     public function validate(array $data, ?string $currentSlug = null): array
     {
@@ -67,6 +69,7 @@ final class PageRepository
         if (!in_array((string)($data['menu'] ?? ''), ['header', 'sidebar', 'none'], true)) $errors[] = 'Menu must be header, sidebar or none.';
         if (filter_var($data['order'] ?? null, FILTER_VALIDATE_INT) === false) $errors[] = 'Order must be an integer.';
         if (self::validSlug($slug) && $slug !== $currentSlug && is_file($this->pathForSlug($slug))) $errors[] = 'A page with this slug already exists.';
+        if (strlen((string)($data['content'] ?? '')) > self::MAX_CONTENT_LENGTH) $errors[] = 'Content is too long.';
         return $errors;
     }
 

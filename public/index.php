@@ -19,10 +19,31 @@ if ($page === null) {
     $status = 404;
     $page = ['title' => 'Not found', 'content' => '# Page not found' . "\n\nThe requested page is not published.", 'mtime' => time()];
 }
-$markdown = new Markdown();
-$contentHtml = $markdown->render((string)$page['content']);
-$renderer = new Renderer();
-$html = $renderer->render('layout', ['title' => (string)$page['title'], 'siteName' => $config->getString('site_name'), 'basePath' => $config->getString('base_path'), 'contentHtml' => $contentHtml, 'headerNav' => $repo->navigation('header'), 'sidebarNav' => $repo->navigation('sidebar')]);
+
+$cacheDir = __DIR__ . '/cache';
+$cacheFile = $cacheDir . '/' . $slug . '.html';
+$cacheValid = false;
+if (is_file($cacheFile) && is_readable($cacheFile)) {
+    $cacheMtime = (int)filemtime($cacheFile);
+    $pageMtime = (int)$page['mtime'];
+    $cacheValid = $cacheMtime >= $pageMtime && $cacheMtime >= $repo->latestMtime();
+}
+
+if ($cacheValid) {
+    $html = file_get_contents($cacheFile);
+    $mtime = (int)filemtime($cacheFile);
+} else {
+    $markdown = new Markdown();
+    $contentHtml = $markdown->render((string)$page['content']);
+    $renderer = new Renderer();
+    $html = $renderer->render('layout', ['title' => (string)$page['title'], 'siteName' => $config->getString('site_name'), 'basePath' => $config->getString('base_path'), 'contentHtml' => $contentHtml, 'headerNav' => $repo->navigation('header'), 'sidebarNav' => $repo->navigation('sidebar')]);
+    $mtime = max((int)$page['mtime'], $repo->latestMtime(), (int)filemtime(__FILE__), (int)filemtime(dirname(__DIR__) . '/public/assets/style.css'));
+    if (!is_dir($cacheDir)) {
+        mkdir($cacheDir, 0775, true);
+    }
+    file_put_contents($cacheFile, $html, LOCK_EX);
+    touch($cacheFile, $mtime);
+}
 $mtime = max((int)$page['mtime'], $repo->latestMtime(), (int)filemtime(__FILE__), (int)filemtime(dirname(__DIR__) . '/public/assets/style.css'));
 $etag = '"' . sha1($html . $mtime) . '"';
 security_headers(false);

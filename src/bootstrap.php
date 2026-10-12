@@ -17,7 +17,12 @@ function e(string $text): string
 
 function security_headers(bool $admin = false): void
 {
-    header("Content-Security-Policy: default-src 'none'; style-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'" . ($admin ? '' : '; img-src \'none\''));
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
+    if ($admin) {
+        header("Content-Security-Policy: default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
+    } else {
+        header("Content-Security-Policy: default-src 'none'; style-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; img-src 'none'");
+    }
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: no-referrer');
     header('X-Frame-Options: DENY');
